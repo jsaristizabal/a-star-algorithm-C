@@ -21,6 +21,9 @@ int main() {
     
     // Crear la matriz
     create_initial_grid(&grid, prob);
+
+    printf("Start coordinates: (%d, %d)\n", grid.start->row, grid.start->col);
+    printf("Goal coordinates: (%d, %d)\n", grid.goal->row, grid.goal->col);
     
     // Imprimir la matriz
     printf("Matriz generada:\n");
