@@ -18,21 +18,36 @@ typedef struct {
     int cols;
 } sGrid;
 
+typedef struct{
+    sNode node;
+    float fCost;
+} sPriorityQ;
+
+
+typedef enum{
+    LOW_PRIORITY,
+    MEDIUM_PRIORITY,
+    HIGH_PRIORITY
+}ePriority;
+
+
 
 
 //------------------------------------------VARIABLES------------------------------------------
-sGrid grid;
 sNode startN = {-1,-1};
 sNode goalN = {-1,-1};
 sNode neighbors[MAX_NEIGHBORS];
 sNode current = {2, 3}; // Nodo actual para la prueba
-int sizeX = 0;
-int sizeY = 0;
-int prob = 0;
+int sizeRows = 15;
+int sizeCols = 15;
+int prob = 2;
 int count = 0;
 
 int matrix[MAX_ROWS][MAX_COLS] = {0};
 //------------------------------------------------------------------------------------
+// Priority Queue
+sPriorityQ priorityQueue[MAX_ROWS * MAX_COLS];
+int pq_size = 0;
 
 
 
@@ -64,8 +79,8 @@ float f_cost(sNode *point){
 
 void init_grid(int matrx[MAX_ROWS][MAX_COLS]){
 
-    for (int i = 0; i < grid.rows; i++){
-        for (int j = 0; j < grid.cols; j++){
+    for (int i = 0; i < sizeRows; i++){
+        for (int j = 0; j < sizeCols; j++){
             matrx[i][j] = (rand() % 10 < prob) ? 1 : 0;//place 0 and 1 for obstacles and free node
         }   
     }
@@ -79,7 +94,7 @@ void updateNeighbors(sNode *current,int matrx[MAX_ROWS][MAX_COLS], sNode neighbo
 
     printf("Current (%d,%d)\n",current->row,current->col);
 
-    if( x+1 < sizeX && !(matrix[x + 1][y] == 1)){//down
+    if( x+1 < sizeRows && !(matrix[x + 1][y] == 1)){//down
         neighbors[*count].row = x+1;
         neighbors[*count].col = y;
         (*count)++;
@@ -90,7 +105,7 @@ void updateNeighbors(sNode *current,int matrx[MAX_ROWS][MAX_COLS], sNode neighbo
     (*count)++;
     }
 
-    if( y + 1 < sizeY && !(matrix[x][y + 1] == 1)){//right
+    if( y + 1 < sizeCols && !(matrix[x][y + 1] == 1)){//right
     neighbors[*count].row = x;
     neighbors[*count].col = y + 1;
     (*count)++;
@@ -115,16 +130,16 @@ void placePoint(int matrx[MAX_ROWS][MAX_COLS], sNode *start, sNode *goal){
     //if start point not provided, generate randomly
     if (start->row == -1 || start->col == -1){
         do{
-            start->row = rand() % grid.rows;
-            start->col = rand() % grid.cols;
+            start->row = rand() % sizeRows;
+            start->col = rand() % sizeCols;
         } while (matrx[start->row][start->col] == 1);
     }
 
     //if start point not provided, generate randomly
     if (goal->row == -1 || goal->col == -1){
         do{
-            goal->row = rand() % grid.rows;
-            goal->col = rand() % grid.cols;
+            goal->row = rand() % sizeRows;
+            goal->col = rand() % sizeCols;
         } while ( (matrx[start->row][start->col] == 1) || (goal->row == start->row && goal->col==start->col));
     }
 
@@ -140,10 +155,10 @@ void placePoint(int matrx[MAX_ROWS][MAX_COLS], sNode *start, sNode *goal){
 
 
 void print_gridNumbers(int matrx[MAX_ROWS][MAX_COLS]){
-    printf("Matrix (%d,%d):\n",grid.rows,grid.cols);
+    printf("Matrix (%d,%d):\n",sizeRows,sizeCols);
 
-    for (int i = 0; i < grid.rows; i++){
-        for (int j = 0; j < grid.cols; j++){
+    for (int i = 0; i < sizeRows; i++){
+        for (int j = 0; j < sizeCols; j++){
             printf("%d",matrx[i][j]);
         }
         printf("\n");
@@ -151,10 +166,10 @@ void print_gridNumbers(int matrx[MAX_ROWS][MAX_COLS]){
 }
 
 void print_grid(int matrx[MAX_ROWS][MAX_COLS]){
-    printf("Matrix size %dx%d:\n",grid.rows,grid.cols);
+    printf("Matrix size %dx%d:\n",sizeRows,sizeCols);
 
-    for (int i = 0; i < grid.rows; i++){
-        for (int j = 0; j < grid.cols; j++){
+    for (int i = 0; i < sizeRows; i++){
+        for (int j = 0; j < sizeCols; j++){
 
             if (matrx[i][j] == 0){
                 printf("\u00B7 ");
@@ -177,6 +192,16 @@ void print_grid(int matrx[MAX_ROWS][MAX_COLS]){
 }
 
 void aStar(int matrx[MAX_ROWS][MAX_COLS]){
+    
+    sPriorityQ openList[MAX_ROWS * MAX_COLS];
+    int openListSize = 0;
+    bool closedList[MAX_ROWS][MAX_COLS] = {false};
+
+    sNode parent[MAX_ROWS][MAX_COLS];
+
+
+
+
 
     
 }
@@ -191,19 +216,15 @@ void clear_screen() {
     #endif
 }
 
-int main(){
+void main(){
     clear_screen();
     srand(time(NULL));
     // srand(12345); //Puedes cambiar 12345 por cualquier otro número
-    sizeX = 5;
-    sizeY = 5;
-    prob = 2;
-    grid.rows = sizeX;
-    grid.cols = sizeY;
+
+
     init_grid(matrix);
     placePoint(matrix,&startN,&goalN);
     print_grid(matrix);
     updateNeighbors(&goalN, matrix, neighbors, &count);
     print_neighbors(neighbors, count);
-    return 0;
 }
