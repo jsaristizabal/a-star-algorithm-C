@@ -5,112 +5,160 @@
 
 #define MAX_ROWS 100
 #define MAX_COLS 100
+#define PATH 100
 #define MAX_NEIGHBORS 4
 
 
 typedef struct {
     int row;
     int col;
+    int xParent;
+    int yParent;
+    bool bObstacle;
+    bool bVisited;
+    int fCost;
+    int hCost;    
 } sNode;
 
 typedef struct {
-    int rows;
-    int cols;
-} sGrid;
-
-typedef struct{
-    sNode node;
-    float fCost;
-} sPriorityQ;
+    int priority;
+    int node;
+} sPriorityQueue;
 
 
-typedef enum{
-    LOW_PRIORITY,
-    MEDIUM_PRIORITY,
-    HIGH_PRIORITY
-}ePriority;
 
 
 
 
 //------------------------------------------VARIABLES------------------------------------------
-sNode startN = {-1,-1};
-sNode goalN = {-1,-1};
 sNode neighbors[MAX_NEIGHBORS];
-sNode current = {2, 3}; // Nodo actual para la prueba
-int sizeRows = 15;
-int sizeCols = 15;
+sNode startN = {4,0};
+sNode goalN = {4,4};
+sNode currentN = {0, 0}; // Nodo actual para la prueba
+
+int sizeRows = 5;
+int sizeCols = 5;
 int prob = 2;
+
+sNode nodesMatrix[MAX_ROWS][MAX_COLS];
+sNode openQueue[PATH];
+sNode closedQueue[PATH];
+
+
 int count = 0;
 
 int matrix[MAX_ROWS][MAX_COLS] = {0};
 //------------------------------------------------------------------------------------
-// Priority Queue
-sPriorityQ priorityQueue[MAX_ROWS * MAX_COLS];
-int pq_size = 0;
 
 
 
-float manhattan_Dist(sNode *p1,sNode *p2){
+int manhattan_Dist(sNode *p1,sNode *p2){
     int x1 = p1->col;
     int y1 = p1->row;
     
     int x2 = p2->col;
     int y2 = p2->row;
 
-    float dist = abs(x2-x1) + abs(y2-y1);
+    int dist = abs(x2 - x1) + abs(y2 - y1);
     
     return (dist);
 }
 
-float h_cost(sNode *point){
+int h_cost(sNode *point){
+    // h(n): Es la funcion heuristica que estima el camino mas corto desde n hasta el FINAL
 
     return manhattan_Dist(point,&goalN);
 }
 
-float g_cost(sNode *point){
+int g_cost(sNode *point){
+    // g(n): es el costo del camino desde el INICIO hasta n
     return manhattan_Dist(&startN,point);
 }
 
-float f_cost(sNode *point){
-    return (g_cost(point)+h_cost(point));
+int f_cost(sNode *point){
+    return (g_cost(point) + h_cost(point));
 }
 
 
-void init_grid(int matrx[MAX_ROWS][MAX_COLS]){
+void init_grid(sNode mtrx[MAX_ROWS][MAX_COLS]){
 
     for (int i = 0; i < sizeRows; i++){
         for (int j = 0; j < sizeCols; j++){
-            matrx[i][j] = (rand() % 10 < prob) ? 1 : 0;//place 0 and 1 for obstacles and free node
+            //assign coordinates (i,j)
+            mtrx[i][j].row = i;
+            mtrx[i][j].col = j;
+            mtrx[i][j].xParent = 0;
+            mtrx[i][j].yParent = 0;
+            mtrx[i][j].bVisited = false;
+            mtrx[i][j].fCost = 0;
+            mtrx[i][j].hCost = 0;
+
+            if (rand() % 10 < prob){
+                mtrx[i][j].bObstacle = true;                
+            }
+            else{
+                mtrx[i][j].bObstacle = false;
+            }
         }   
     }
 }
 
-void updateNeighbors(sNode *current,int matrx[MAX_ROWS][MAX_COLS], sNode neighbors[MAX_NEIGHBORS], int *count){
+
+void print_grid(sNode mtrx[MAX_ROWS][MAX_COLS], sNode *start,sNode *goal){
+    printf("Matrix (%d,%d):\n",sizeRows,sizeCols);
+
+    for (int i = 0; i < sizeRows; i++){
+        for (int j = 0; j < sizeCols; j++){
+
+            if((mtrx[i][j].row == start->row) && (mtrx[i][j].col == start->col)){
+                mtrx[i][j].bObstacle = false;
+                printf("S ");
+            }
+
+            else if((mtrx[i][j].row == goal->row) && (mtrx[i][j].col == goal->col)){
+                mtrx[i][j].bObstacle = false;
+                printf("G ");
+
+            }
+
+            else if (mtrx[i][j].bObstacle == false){
+                printf("\u00B7 ");
+            }
+            else if(mtrx[i][j].bObstacle == true){
+                printf("X ");
+            }
+
+
+        }
+        printf("\n");
+    }
+}
+
+void updateNeighbors(sNode *current, sNode matrx[MAX_ROWS][MAX_COLS], sNode neighbors[MAX_NEIGHBORS], int *count){
     int x = current->row;
     int y = current->col;
     
     *count = 0;
 
-    printf("Current (%d,%d)\n",current->row,current->col);
+    printf("Current (%d,%d)\n",x,y);
 
-    if( x+1 < sizeRows && !(matrix[x + 1][y] == 1)){//down
+    if( x+1 < sizeRows && (matrx[x + 1][y].bObstacle == false)){//down
         neighbors[*count].row = x+1;
         neighbors[*count].col = y;
         (*count)++;
     }
-    if( x > 0 && !(matrix[x - 1][y] == 1)){//up
+    if( x > 0 && (matrx[x - 1][y].bObstacle == false)){//up
     neighbors[*count].row = x - 1;
     neighbors[*count].col = y;
     (*count)++;
     }
 
-    if( y + 1 < sizeCols && !(matrix[x][y + 1] == 1)){//right
+    if( y + 1 < sizeCols && (matrx[x][y + 1].bObstacle == false)){//right
     neighbors[*count].row = x;
     neighbors[*count].col = y + 1;
     (*count)++;
     }
-    if( y > 0 && !(matrix[x][y - 1] == 1)){//left
+    if( y > 0 && (matrx[x][y - 1].bObstacle == false)){//left
     neighbors[*count].row = x;
     neighbors[*count].col = y - 1;
     (*count)++;
@@ -122,89 +170,43 @@ void print_neighbors(sNode neighbors[MAX_NEIGHBORS], int count) {
     printf("Neighbors:\n");
     for (int i = 0; i < count; i++) {
         printf("(%d, %d)\n", neighbors[i].row, neighbors[i].col);
+        printf("gcost %d\n",g_cost(&neighbors[i]));
+        printf("hcost %d\n",h_cost(&neighbors[i]));
+        printf("fcost %d\n",f_cost(&neighbors[i]));
+
     }
 }
 
-void placePoint(int matrx[MAX_ROWS][MAX_COLS], sNode *start, sNode *goal){
-    
-    //if start point not provided, generate randomly
-    if (start->row == -1 || start->col == -1){
-        do{
-            start->row = rand() % sizeRows;
-            start->col = rand() % sizeCols;
-        } while (matrx[start->row][start->col] == 1);
-    }
-
-    //if start point not provided, generate randomly
-    if (goal->row == -1 || goal->col == -1){
-        do{
-            goal->row = rand() % sizeRows;
-            goal->col = rand() % sizeCols;
-        } while ( (matrx[start->row][start->col] == 1) || (goal->row == start->row && goal->col==start->col));
-    }
-
-        // Place points in the matrix
-    matrx[start->row][start->col] = 2; // Start point
-    matrx[goal->row][goal->col] = 3;   // Goal point
-
-    printf("Start point: (%d, %d)\n", start->row, start->col);
-    printf("Goal point: (%d, %d)\n", goal->row, goal->col);
-
-}
 
 
+void aStar(sNode matrx[MAX_ROWS][MAX_COLS]){
 
-void print_gridNumbers(int matrx[MAX_ROWS][MAX_COLS]){
-    printf("Matrix (%d,%d):\n",sizeRows,sizeCols);
+    int temp_f = 0;
+    int temp_g = 0;
+    int temp_h = 0;
 
-    for (int i = 0; i < sizeRows; i++){
-        for (int j = 0; j < sizeCols; j++){
-            printf("%d",matrx[i][j]);
-        }
-        printf("\n");
-    }
-}
-
-void print_grid(int matrx[MAX_ROWS][MAX_COLS]){
-    printf("Matrix size %dx%d:\n",sizeRows,sizeCols);
-
-    for (int i = 0; i < sizeRows; i++){
-        for (int j = 0; j < sizeCols; j++){
-
-            if (matrx[i][j] == 0){
-                printf("\u00B7 ");
-            }
-            else if(matrx[i][j] == 1){
-                printf("X ");
-            }
-            else if(matrx[i][j] == 2){
-                printf("S ");
-            }
-            else if(matrx[i][j] == 3){
-                printf("G ");
-            }
-            else if(matrx[i][j] == 4){
-                printf("@ ");
-            }
-        }
-        printf("\n");
-    }
-}
-
-void aStar(int matrx[MAX_ROWS][MAX_COLS]){
-    
-    sPriorityQ openList[MAX_ROWS * MAX_COLS];
-    int openListSize = 0;
-    bool closedList[MAX_ROWS][MAX_COLS] = {false};
-
-    sNode parent[MAX_ROWS][MAX_COLS];
-
-
-
+    updateNeighbors(&currentN, nodesMatrix, neighbors, &count);
 
 
     
+
+    do{
+        for (int i = 0; i < count; i++) {
+            temp_f = f_cost(&neighbors[i]);
+            temp_g = h_cost(&neighbors[i]);
+            temp_h = g_cost(&neighbors[i]);
+            }
+
+        
+        /* code */
+    } while (goalN.row != currentN.row && goalN.col != currentN.col);
+    
+
+
+
+
 }
+
 
 // Function to clear the terminal screen
 void clear_screen() {
@@ -222,9 +224,11 @@ void main(){
     // srand(12345); //Puedes cambiar 12345 por cualquier otro número
 
 
-    init_grid(matrix);
-    placePoint(matrix,&startN,&goalN);
-    print_grid(matrix);
-    updateNeighbors(&goalN, matrix, neighbors, &count);
+    init_grid(nodesMatrix);
+    print_grid(nodesMatrix,&startN,&goalN);
+
+    updateNeighbors(&startN, nodesMatrix, neighbors, &count);
     print_neighbors(neighbors, count);
+
+    // printf("prueba manhattan %d:\n",manhattan_Dist(&currentN,&goalN));
 }
