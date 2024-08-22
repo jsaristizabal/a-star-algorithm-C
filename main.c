@@ -79,7 +79,7 @@ void updateNeighbors(sNode *current,int matrx[MAX_ROWS][MAX_COLS], sNode neighbo
 
     printf("Current (%d,%d)\n",current->row,current->col);
 
-    if( x < sizeX && !(matrix[x + 1][y] == 1)){//down
+    if( x+1 < sizeX && !(matrix[x + 1][y] == 1)){//down
         neighbors[*count].row = x+1;
         neighbors[*count].col = y;
         (*count)++;
@@ -90,7 +90,7 @@ void updateNeighbors(sNode *current,int matrx[MAX_ROWS][MAX_COLS], sNode neighbo
     (*count)++;
     }
 
-    if( y < sizeY && !(matrix[x][y + 1] == 1)){//right
+    if( y + 1 < sizeY && !(matrix[x][y + 1] == 1)){//right
     neighbors[*count].row = x;
     neighbors[*count].col = y + 1;
     (*count)++;
@@ -151,7 +151,7 @@ void print_gridNumbers(int matrx[MAX_ROWS][MAX_COLS]){
 }
 
 void print_grid(int matrx[MAX_ROWS][MAX_COLS]){
-    printf("Matrix size (%d,%d):\n",grid.rows,grid.cols);
+    printf("Matrix size %dx%d:\n",grid.rows,grid.cols);
 
     for (int i = 0; i < grid.rows; i++){
         for (int j = 0; j < grid.cols; j++){
@@ -176,6 +176,10 @@ void print_grid(int matrx[MAX_ROWS][MAX_COLS]){
     }
 }
 
+void aStar(int matrx[MAX_ROWS][MAX_COLS]){
+
+    
+}
 
 // Function to clear the terminal screen
 void clear_screen() {
@@ -191,26 +195,15 @@ int main(){
     clear_screen();
     srand(time(NULL));
     // srand(12345); //Puedes cambiar 12345 por cualquier otro número
-    
     sizeX = 5;
     sizeY = 5;
     prob = 2;
-    
     grid.rows = sizeX;
     grid.cols = sizeY;
-
     init_grid(matrix);
     placePoint(matrix,&startN,&goalN);
-
     print_grid(matrix);
-
     updateNeighbors(&goalN, matrix, neighbors, &count);
-    
     print_neighbors(neighbors, count);
-
-
-
-
-
     return 0;
 }
