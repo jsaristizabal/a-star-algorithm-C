@@ -3,46 +3,41 @@
 #include <time.h>
 #include <stdbool.h>
 
+
 #define MAX_ROWS 100
 #define MAX_COLS 100
-#define PATH 100
 #define MAX_NEIGHBORS 4
 
 
 typedef struct {
-    int row;
-    int col;
-    int xParent;
-    int yParent;
+    float row;
+    float col;
+    float xParent;
+    float yParent;
     bool bObstacle;
     bool bVisited;
-    int fCost;
-    int hCost;    
+    float fCost;
+    float hCost;    
 } sNode;
 
-typedef struct {
-    int priority;
-    int node;
-} sPriorityQueue;
-
-
-
-
-
-
-//------------------------------------------VARIABLES------------------------------------------
+//------------------------------------------VARIABLES GLOBALES------------------------------------------
 sNode neighbors[MAX_NEIGHBORS];
-sNode startN = {4,0};
-sNode goalN = {4,4};
-sNode currentN = {0, 0}; // Nodo actual para la prueba
+sNode startN = {4,1};
+sNode goalN = {4,5};
 
-int sizeRows = 5;
-int sizeCols = 5;
-int prob = 2;
+
+
+int openLsize = 0;
+int fCosts[MAX_ROWS] = {0};
+sNode openL[MAX_ROWS] = {0};
+
+
+int sizeRows = 10;
+int sizeCols = 10;
+int prob = 0;
 
 sNode nodesMatrix[MAX_ROWS][MAX_COLS];
-sNode openQueue[PATH];
-sNode closedQueue[PATH];
+
 
 
 int count = 0;
@@ -52,30 +47,30 @@ int matrix[MAX_ROWS][MAX_COLS] = {0};
 
 
 
-int manhattan_Dist(sNode *p1,sNode *p2){
-    int x1 = p1->col;
-    int y1 = p1->row;
+float manhattan_Dist(sNode *p1,sNode *p2){
+    float x1 = p1->col;
+    float y1 = p1->row;
     
-    int x2 = p2->col;
-    int y2 = p2->row;
+    float x2 = p2->col;
+    float y2 = p2->row;
 
-    int dist = abs(x2 - x1) + abs(y2 - y1);
+    float dist = abs(x2 - x1) + abs(y2 - y1);
     
     return (dist);
 }
 
-int h_cost(sNode *point){
+float h_cost(sNode *point){
     // h(n): Es la funcion heuristica que estima el camino mas corto desde n hasta el FINAL
 
     return manhattan_Dist(point,&goalN);
 }
 
-int g_cost(sNode *point){
+float g_cost(sNode *point){
     // g(n): es el costo del camino desde el INICIO hasta n
     return manhattan_Dist(&startN,point);
 }
 
-int f_cost(sNode *point){
+float f_cost(sNode *point){
     return (g_cost(point) + h_cost(point));
 }
 
@@ -105,7 +100,9 @@ void init_grid(sNode mtrx[MAX_ROWS][MAX_COLS]){
 
 
 void print_grid(sNode mtrx[MAX_ROWS][MAX_COLS], sNode *start,sNode *goal){
-    printf("Matrix (%d,%d):\n",sizeRows,sizeCols);
+    printf("Matrix %dx%d\t",sizeRows,sizeCols);
+    printf("Start= (%.1f,%.1f):\t",start->row,start->col);
+    printf("Goal= (%.1f,%.1f):\n",goal->row,goal->col);
 
     for (int i = 0; i < sizeRows; i++){
         for (int j = 0; j < sizeCols; j++){
@@ -140,7 +137,7 @@ void updateNeighbors(sNode *current, sNode matrx[MAX_ROWS][MAX_COLS], sNode neig
     
     *count = 0;
 
-    printf("Current (%d,%d)\n",x,y);
+    printf("CurrentN (%d,%d)\n",x,y);
 
     if( x+1 < sizeRows && (matrx[x + 1][y].bObstacle == false)){//down
         neighbors[*count].row = x+1;
@@ -163,7 +160,9 @@ void updateNeighbors(sNode *current, sNode matrx[MAX_ROWS][MAX_COLS], sNode neig
     neighbors[*count].col = y - 1;
     (*count)++;
     }
+    printf("Neighbors Count (%d)\n",*count);
 }
+
 
 // Función para imprimir la lista de vecinos
 void print_neighbors(sNode neighbors[MAX_NEIGHBORS], int count) {
@@ -173,7 +172,6 @@ void print_neighbors(sNode neighbors[MAX_NEIGHBORS], int count) {
         printf("gcost %d\n",g_cost(&neighbors[i]));
         printf("hcost %d\n",h_cost(&neighbors[i]));
         printf("fcost %d\n",f_cost(&neighbors[i]));
-
     }
 }
 
@@ -181,30 +179,108 @@ void print_neighbors(sNode neighbors[MAX_NEIGHBORS], int count) {
 
 void aStar(sNode matrx[MAX_ROWS][MAX_COLS]){
 
-    int temp_f = 0;
-    int temp_g = 0;
-    int temp_h = 0;
-
-    updateNeighbors(&currentN, nodesMatrix, neighbors, &count);
-
-
+    printf("A*...\n");
     
 
-    do{
+    sNode currentN = startN; // Nodo actual
+
+    bool closedL[MAX_ROWS][MAX_COLS] = {false};//Lista de nodos cerrados
+    
+    openL[openLsize++] = startN; //agregamos el nodo inicial a la lista abierta
+    
+    updateNeighbors(&openL[0], nodesMatrix, neighbors, &count);//revisemos los vecinos en la lista abierta iteracion 1
+
+    //agregamos el vecino a la lista abierta
         for (int i = 0; i < count; i++) {
-            temp_f = f_cost(&neighbors[i]);
-            temp_g = h_cost(&neighbors[i]);
-            temp_h = g_cost(&neighbors[i]);
-            }
+        openL[openLsize++] = neighbors[i];//si todos los vecinos son viables, en este punto openLsize es 5(4 vecinos y 1 start)
+    }
 
+
+    //recorremos la lista abierta para buscar el menor fcost   entre los vecinos, por esto i=1
+    int bestIndex = 0;
+    for (int i = 1; i < openLsize; i++){
+
+        printf("valor de i (%d)\n",i);
+        printf("coordenada (%.1f,%.1f)\n",openL[i].row,openL[i].col);
         
-        /* code */
-    } while (goalN.row != currentN.row && goalN.col != currentN.col);
+        printf("fcost %.1f\n\n",f_cost(&openL[i]));
+
+        //almacenamos el mejor fcost
+        if (f_cost(&openL[i]) <= f_cost(&openL[bestIndex])){
+            bestIndex = i;  //guardamos el valor del menor fcost
+            printf("valor de mejor index (%d)\n",bestIndex);
+        }
+        
+    }
+
+    //agregamos el nodo inicial a la lista cerrada ya que fue explorado
+    closedL[(int)currentN.row][(int)currentN.col] = true;
+
     
+    //nos desplazamos al nodo con costo mas bajo y asignamos la procedencia
+    sNode *nextNode = &openL[bestIndex];
+    nextNode->xParent = currentN.row;
+    nextNode->yParent = currentN.col;
+    printf("coordenada ANTES de moverse (%.1f,%.1f)\n",currentN.row, currentN.col);
+    currentN = *nextNode;
+
+
+
+    printf("coordenada DESPUES de moverse (%.1f,%.1f)\n",currentN.row, currentN.col);
 
 
 
 
+    if (currentN.row == goalN.row && currentN.col == goalN.col) {
+        printf("Goal reached!\n");
+        // Aquí deberías reconstruir y mostrar el camino
+        return;
+    }
+
+    // updateNeighbors(&openL[0], nodesMatrix, neighbors, &count);//revisemos los vecinos en la lista abierta iteracion 1
+
+    printf("coordenada despues de moverse y eliminar el nodo inicial (%.1f,%.1f)\n",openL[0].row,openL[0].col);
+    
+}
+
+
+void rmFromOpenL(sNode nodeToRM){
+    int indexToRm = -1;
+    for (int i = 0; i < openLsize; i++){
+        if (openL[i].row == nodeToRM.row && openL[i].col == nodeToRM.col){
+            indexToRm = i;
+            break;
+        }        
+    }
+
+    if (indexToRm != -1){
+        if (indexToRm < openLsize -1){
+            openL[indexToRm] = openL[--openLsize];
+        }
+        else{
+            --openLsize;
+        }
+
+    }
+
+}
+
+
+void checkCosts(void){
+    int bestIndex = 0;
+    for (int i = 0; i < openLsize; i++) {
+        printf("iteracion (%.1f)\n", i);
+
+        if (f_cost(&openL[i])){
+            /* code */
+        }
+        
+        
+        printf("(%.1f, %.1f)\n", neighbors[i].row, neighbors[i].col);
+        printf("gcost %.1f\n",g_cost(&neighbors[i]));
+        printf("hcost %.1f\n",h_cost(&neighbors[i]));
+        printf("fcost %.1f\n\n",f_cost(&neighbors[i]));
+    }
 }
 
 
@@ -218,17 +294,42 @@ void clear_screen() {
     #endif
 }
 
+int getValue(const char *prompt, int min,int max) {
+    int input = 0;
+    int readResult = 0;
+
+    while (1) {
+        printf("%s", prompt); // Display the prompt message
+        readResult = scanf("%d", &input); // Read integer input and store the result
+
+        if (readResult != 1) { // Check if the input was not a valid integer
+            printf("Ingresa un valor valido\n");
+        } 
+        else if (input < min || input > max) { // Check if the input is within the allowed range
+            printf("El valor no se encuentra en el rango\n");
+        } 
+        else {
+            return input; // Return the valid input
+        }
+    }
+}
+
 void main(){
     clear_screen();
     srand(time(NULL));
     // srand(12345); //Puedes cambiar 12345 por cualquier otro número
 
+    // sizeRows = getValue("Ingrese el tamaño m de la matriz (10-100): ",10,MAX_ROWS);
+    // sizeCols = getValue("Ingrese el tamaño n de la matriz (10-100): ",10,MAX_COLS);
+    // prob = getValue("Ingresa la probabilidad de obstaculos (0-3): ",0,3);
+
 
     init_grid(nodesMatrix);
     print_grid(nodesMatrix,&startN,&goalN);
+    aStar(nodesMatrix);
 
-    updateNeighbors(&startN, nodesMatrix, neighbors, &count);
-    print_neighbors(neighbors, count);
+    // updateNeighbors(&startN, nodesMatrix, neighbors, &count);
+    // print_neighbors(neighbors, count);
 
     // printf("prueba manhattan %d:\n",manhattan_Dist(&currentN,&goalN));
 }
