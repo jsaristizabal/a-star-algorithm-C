@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 
 #define MAX_ROWS 100
@@ -15,15 +16,15 @@ typedef struct {
     int xParent;
     int yParent;
     bool bObstacle;
-    bool bVisited;
+    bool bPath;
     int fCost;
     int hCost;    
 } sNode;
 
 //------------------------------------------VARIABLES GLOBALES------------------------------------------
 sNode neighborsList[MAX_NEIGHBORS];
-sNode startN = {4,1};
-sNode goalN = {4,9};
+sNode startN = {-1,-1};
+sNode goalN = {-1,-1};
 
 int bestIndex = 0;
 
@@ -33,11 +34,12 @@ int openLsize = 0;
 int fCosts[MAX_ROWS] = {0};
 sNode openL[MAX_ROWS] = {0};
 bool closedL[MAX_ROWS][MAX_COLS] = {false};//Lista de nodos cerrados
-
+sNode pathMatrix[MAX_ROWS] = {0}; // Matriz para almacenar el camino
+int auxPath = 0;
 
 int sizeRows = 10;
 int sizeCols = 10;
-int prob = 0;
+int prob = 3;
 
 sNode nodesMatrix[MAX_ROWS][MAX_COLS];
 
@@ -91,7 +93,7 @@ void init_grid(sNode mtrx[MAX_ROWS][MAX_COLS]){
             mtrx[i][j].col = j;
             mtrx[i][j].xParent = 0;
             mtrx[i][j].yParent = 0;
-            mtrx[i][j].bVisited = false;
+            mtrx[i][j].bPath = false;
             mtrx[i][j].fCost = 0;
             mtrx[i][j].hCost = 0;
 
@@ -103,6 +105,33 @@ void init_grid(sNode mtrx[MAX_ROWS][MAX_COLS]){
             }
         }   
     }
+}
+
+void placePoint(int matrx[MAX_ROWS][MAX_COLS], sNode *start, sNode *goal){
+    
+    //if start point not provided, generate randomly
+    if (start->row == -1 || start->col == -1){
+        do{
+            start->row = rand() % sizeRows;
+            start->col = rand() % sizeCols;
+        } while (matrx[start->row][start->col] == 1);
+    }
+
+    //if start point not provided, generate randomly
+    if (goal->row == -1 || goal->col == -1){
+        do{
+            goal->row = rand() % sizeRows;
+            goal->col = rand() % sizeCols;
+        } while ( (matrx[start->row][start->col] == 1) || (goal->row == start->row && goal->col==start->col));
+    }
+
+        // Place points in the matrix
+    matrx[start->row][start->col] = 2; // Start point
+    matrx[goal->row][goal->col] = 3;   // Goal point
+
+    printf("Start point: (%d, %d)\n", start->row, start->col);
+    printf("Goal point: (%d, %d)\n", goal->row, goal->col);
+
 }
 
 
@@ -124,6 +153,9 @@ void print_grid(sNode mtrx[MAX_ROWS][MAX_COLS], sNode *start,sNode *goal){
                 printf("G ");
 
             }
+            else if (mtrx[i][j].bPath == true){
+                printf("@ ");
+            }
 
             else if (mtrx[i][j].bObstacle == false){
                 printf("\u00B7 ");
@@ -131,8 +163,7 @@ void print_grid(sNode mtrx[MAX_ROWS][MAX_COLS], sNode *start,sNode *goal){
             else if(mtrx[i][j].bObstacle == true){
                 printf("X ");
             }
-
-
+            
         }
         printf("\n");
     }
@@ -146,23 +177,23 @@ void updateNeighbors(sNode *current, sNode matrx[MAX_ROWS][MAX_COLS], sNode neig
 
     printf("Nodo actual (%d,%d)-----------------------------------------------------\n",x,y);
 
-    if( x+1 < sizeRows && (matrx[x + 1][y].bObstacle == false) && (matrx[x + 1][y].bVisited == false)){//down
+    if( x+1 < sizeRows && (matrx[x + 1][y].bObstacle == false)){//down
         neighbors[*count].row = x+1;
         neighbors[*count].col = y;
         (*count)++;
     }
-    if( x > 0 && (matrx[x - 1][y].bObstacle == false) && (matrx[x - 1][y].bVisited == false)){//up
+    if( x > 0 && (matrx[x - 1][y].bObstacle == false)){//up
     neighbors[*count].row = x - 1;
     neighbors[*count].col = y;
     (*count)++;
     }
 
-    if( y + 1 < sizeCols && (matrx[x][y + 1].bObstacle == false) && (matrx[x][y + 1].bVisited == false)){//right
+    if( y + 1 < sizeCols && (matrx[x][y + 1].bObstacle == false)){//right
     neighbors[*count].row = x;
     neighbors[*count].col = y + 1;
     (*count)++;
     }
-    if( y > 0 && (matrx[x][y - 1].bObstacle == false) && (matrx[x][y - 1].bVisited == false)){//left
+    if( y > 0 && (matrx[x][y - 1].bObstacle == false)){//left
     neighbors[*count].row = x;
     neighbors[*count].col = y - 1;
     (*count)++;
@@ -194,7 +225,7 @@ void aStar(sNode matrx[MAX_ROWS][MAX_COLS]){
     openL[openLsize++] = startN; //agregamos el nodo inicial a la lista abierta
 
     int iteration = 0; // Variable de control para las iteraciones
-    int maxIterations = 11; // Establece el número máximo de iteraciones
+    int maxIterations = 1000; // Establece el número máximo de iteraciones
     
 
     while (openLsize >0 && iteration < maxIterations){
@@ -229,6 +260,19 @@ void aStar(sNode matrx[MAX_ROWS][MAX_COLS]){
             printf("Recorriendo OpenL: en nodo (%d,%d)\n",openL[i].row,openL[i].col);
         }
         
+        // Marcar el nodo actual en la matriz de camino
+        printf("construimos el camino con a: (%d,%d)\n",currentN.row,currentN.col);
+        // matrx[currentN.row][currentN.col].bPath = true;
+        pathMatrix[auxPath++] = currentN; // Marcar el nodo actual como parte del camino
+
+
+        // recorremos pathmatrix e imprimimos
+        for (int i = 0; i < auxPath; i++){
+            printf("PathMatrix (%d) en nodo (%d,%d)\n",i,pathMatrix[i].row,pathMatrix[i].col);
+        }
+
+        printf("aux path: %d\n",auxPath);
+
         //nos desplazamos al nodo con costo mas bajo y asignamos la procedencia
         sNode *nextNode = &openL[bestIndex];
         nextNode->xParent = currentN.row;
@@ -264,7 +308,6 @@ void rmFromOpenL(sNode* nodeToRM){
     // printf("Vamos a eliminar (%d,%d) de la lista abierta\n",nodeToRM->row,nodeToRM->col);
     // printf("openLsize: %d\n",openLsize);
     closedL[nodeToRM->row][nodeToRM->col] = true;
-    nodeToRM->bVisited = true;
 
     for (int i = 0; i < openLsize; i++){
         // printf("Recorriendo OpenL: en nodo (%d,%d)\n",openL[i].row,openL[i].col);
@@ -301,9 +344,18 @@ void searchBestF(void){
     //recorremos OpenL
     for (int i = 1; i < openLsize; i++){
         //Comparamos los f cost para buscar el mejor
-        if (f_cost(&openL[i]) <= f_cost(&openL[bestIndex])){
+        if (f_cost(&openL[i]) < f_cost(&openL[bestIndex])){
             bestIndex = i;  //guardamos el valor del menor fcost
         }
+
+        //si hay un empate en f usamos h para desempatar
+        else if (f_cost(&openL[i]) == f_cost(&openL[bestIndex])){
+            if (h_cost(&openL[i]) < h_cost(&openL[bestIndex])){
+                bestIndex = i;
+            }
+
+        }
+        
     }
     printf("El mejor fcost es %d con coordenada (%d,%d)\n",f_cost(&openL[bestIndex]),openL[bestIndex].row,openL[bestIndex].col);
 }
@@ -348,8 +400,16 @@ void main(){
     // sizeCols = getValue("Ingrese el tamaño n de la matriz (10-100): ",10,MAX_COLS);
     // prob = getValue("Ingresa la probabilidad de obstaculos (0-3): ",0,3);
 
-
+    placePoint(nodesMatrix,&startN,&goalN);
     init_grid(nodesMatrix);
     print_grid(nodesMatrix,&startN,&goalN);
     aStar(nodesMatrix);
+
+    for(int i = 0; i < auxPath; i++){
+        clear_screen();
+        nodesMatrix[pathMatrix[i].row][pathMatrix[i].col].bPath = true;
+        print_grid(nodesMatrix,&startN,&goalN);
+        usleep(300000); // Espera 200,000 microsegundos (0.2 segundos)
+    }
+    print_grid(nodesMatrix,&startN,&goalN);
 }
