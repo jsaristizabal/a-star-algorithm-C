@@ -10,26 +10,29 @@
 
 
 typedef struct {
-    float row;
-    float col;
-    float xParent;
-    float yParent;
+    int row;
+    int col;
+    int xParent;
+    int yParent;
     bool bObstacle;
     bool bVisited;
-    float fCost;
-    float hCost;    
+    int fCost;
+    int hCost;    
 } sNode;
 
 //------------------------------------------VARIABLES GLOBALES------------------------------------------
-sNode neighbors[MAX_NEIGHBORS];
+sNode neighborsList[MAX_NEIGHBORS];
 sNode startN = {4,1};
-sNode goalN = {4,5};
+sNode goalN = {4,9};
+
+int bestIndex = 0;
 
 
 
 int openLsize = 0;
 int fCosts[MAX_ROWS] = {0};
 sNode openL[MAX_ROWS] = {0};
+bool closedL[MAX_ROWS][MAX_COLS] = {false};//Lista de nodos cerrados
 
 
 int sizeRows = 10;
@@ -38,39 +41,43 @@ int prob = 0;
 
 sNode nodesMatrix[MAX_ROWS][MAX_COLS];
 
+int countNeighbors = 0;
 
 
-int count = 0;
 
 int matrix[MAX_ROWS][MAX_COLS] = {0};
 //------------------------------------------------------------------------------------
 
 
+void searchBestF(void);
+void rmFromOpenL(sNode* nodeToRM);
 
-float manhattan_Dist(sNode *p1,sNode *p2){
-    float x1 = p1->col;
-    float y1 = p1->row;
+
+
+int manhattan_Dist(sNode *p1,sNode *p2){
+    int x1 = p1->col;
+    int y1 = p1->row;
     
-    float x2 = p2->col;
-    float y2 = p2->row;
+    int x2 = p2->col;
+    int y2 = p2->row;
 
-    float dist = abs(x2 - x1) + abs(y2 - y1);
+    int dist = abs(x2 - x1) + abs(y2 - y1);
     
     return (dist);
 }
 
-float h_cost(sNode *point){
+int h_cost(sNode *point){
     // h(n): Es la funcion heuristica que estima el camino mas corto desde n hasta el FINAL
 
     return manhattan_Dist(point,&goalN);
 }
 
-float g_cost(sNode *point){
+int g_cost(sNode *point){
     // g(n): es el costo del camino desde el INICIO hasta n
     return manhattan_Dist(&startN,point);
 }
 
-float f_cost(sNode *point){
+int f_cost(sNode *point){
     return (g_cost(point) + h_cost(point));
 }
 
@@ -101,8 +108,8 @@ void init_grid(sNode mtrx[MAX_ROWS][MAX_COLS]){
 
 void print_grid(sNode mtrx[MAX_ROWS][MAX_COLS], sNode *start,sNode *goal){
     printf("Matrix %dx%d\t",sizeRows,sizeCols);
-    printf("Start= (%.1f,%.1f):\t",start->row,start->col);
-    printf("Goal= (%.1f,%.1f):\n",goal->row,goal->col);
+    printf("Start= (%d,%d):\t",start->row,start->col);
+    printf("Goal= (%d,%d):\n",goal->row,goal->col);
 
     for (int i = 0; i < sizeRows; i++){
         for (int j = 0; j < sizeCols; j++){
@@ -137,36 +144,36 @@ void updateNeighbors(sNode *current, sNode matrx[MAX_ROWS][MAX_COLS], sNode neig
     
     *count = 0;
 
-    printf("CurrentN (%d,%d)\n",x,y);
+    printf("Nodo actual (%d,%d)-----------------------------------------------------\n",x,y);
 
-    if( x+1 < sizeRows && (matrx[x + 1][y].bObstacle == false)){//down
+    if( x+1 < sizeRows && (matrx[x + 1][y].bObstacle == false) && (matrx[x + 1][y].bVisited == false)){//down
         neighbors[*count].row = x+1;
         neighbors[*count].col = y;
         (*count)++;
     }
-    if( x > 0 && (matrx[x - 1][y].bObstacle == false)){//up
+    if( x > 0 && (matrx[x - 1][y].bObstacle == false) && (matrx[x - 1][y].bVisited == false)){//up
     neighbors[*count].row = x - 1;
     neighbors[*count].col = y;
     (*count)++;
     }
 
-    if( y + 1 < sizeCols && (matrx[x][y + 1].bObstacle == false)){//right
+    if( y + 1 < sizeCols && (matrx[x][y + 1].bObstacle == false) && (matrx[x][y + 1].bVisited == false)){//right
     neighbors[*count].row = x;
     neighbors[*count].col = y + 1;
     (*count)++;
     }
-    if( y > 0 && (matrx[x][y - 1].bObstacle == false)){//left
+    if( y > 0 && (matrx[x][y - 1].bObstacle == false) && (matrx[x][y - 1].bVisited == false)){//left
     neighbors[*count].row = x;
     neighbors[*count].col = y - 1;
     (*count)++;
     }
-    printf("Neighbors Count (%d)\n",*count);
+    // printf("Neighbors Count (%d)\n",*count);
 }
 
 
 // Función para imprimir la lista de vecinos
 void print_neighbors(sNode neighbors[MAX_NEIGHBORS], int count) {
-    printf("Neighbors:\n");
+    printf("Neighbors (%d):\n", count);
     for (int i = 0; i < count; i++) {
         printf("(%d, %d)\n", neighbors[i].row, neighbors[i].col);
         printf("gcost %d\n",g_cost(&neighbors[i]));
@@ -175,7 +182,7 @@ void print_neighbors(sNode neighbors[MAX_NEIGHBORS], int count) {
     }
 }
 
-
+//------------------------------------------------------ALGORITMO PRINCIPAL------------------------------------------------------
 
 void aStar(sNode matrx[MAX_ROWS][MAX_COLS]){
 
@@ -184,75 +191,94 @@ void aStar(sNode matrx[MAX_ROWS][MAX_COLS]){
 
     sNode currentN = startN; // Nodo actual
 
-    bool closedL[MAX_ROWS][MAX_COLS] = {false};//Lista de nodos cerrados
-    
     openL[openLsize++] = startN; //agregamos el nodo inicial a la lista abierta
+
+    int iteration = 0; // Variable de control para las iteraciones
+    int maxIterations = 11; // Establece el número máximo de iteraciones
     
-    updateNeighbors(&openL[0], nodesMatrix, neighbors, &count);//revisemos los vecinos en la lista abierta iteracion 1
 
-    //agregamos el vecino a la lista abierta
-        for (int i = 0; i < count; i++) {
-        openL[openLsize++] = neighbors[i];//si todos los vecinos son viables, en este punto openLsize es 5(4 vecinos y 1 start)
-    }
+    while (openLsize >0 && iteration < maxIterations){
 
 
-    //recorremos la lista abierta para buscar el menor fcost   entre los vecinos, por esto i=1
-    int bestIndex = 0;
-    for (int i = 1; i < openLsize; i++){
-
-        printf("valor de i (%d)\n",i);
-        printf("coordenada (%.1f,%.1f)\n",openL[i].row,openL[i].col);
+        printf("\niteracion de while: %d \t",iteration);
+        updateNeighbors(&currentN, matrx, neighborsList, &countNeighbors);//revisemos los vecinos
+        print_neighbors(neighborsList, countNeighbors);
         
-        printf("fcost %.1f\n\n",f_cost(&openL[i]));
+        //agregamos el vecino a la lista abierta
+        for (int i = 0; i < countNeighbors; i++){
+            if (closedL[neighborsList[i].row][neighborsList[i].col] == false){
+                printf("agregando el vecino %d a la lista abierta: (%d,%d)\n",i,neighborsList[i].row,neighborsList[i].col);
+                openL[openLsize++] = neighborsList[i];
+            }
 
-        //almacenamos el mejor fcost
-        if (f_cost(&openL[i]) <= f_cost(&openL[bestIndex])){
-            bestIndex = i;  //guardamos el valor del menor fcost
-            printf("valor de mejor index (%d)\n",bestIndex);
+        }
+
+
+        searchBestF();
+        for (int i = 0; i < openLsize; i++){
+            printf("Recorriendo OpenL: en nodo (%d,%d)\n",openL[i].row,openL[i].col);
+        }
+
+        printf("nodo (%d,%d)removido\n",currentN.row,currentN.col);
+        printf("openLsize era : %d\n",openLsize);
+    
+        rmFromOpenL(&currentN);
+        
+        printf("openLsize ahora es: %d\n",openLsize);
+        for (int i = 0; i < openLsize; i++){
+            printf("Recorriendo OpenL: en nodo (%d,%d)\n",openL[i].row,openL[i].col);
         }
         
-    }
-
-    //agregamos el nodo inicial a la lista cerrada ya que fue explorado
-    closedL[(int)currentN.row][(int)currentN.col] = true;
-
-    
-    //nos desplazamos al nodo con costo mas bajo y asignamos la procedencia
-    sNode *nextNode = &openL[bestIndex];
-    nextNode->xParent = currentN.row;
-    nextNode->yParent = currentN.col;
-    printf("coordenada ANTES de moverse (%.1f,%.1f)\n",currentN.row, currentN.col);
-    currentN = *nextNode;
+        //nos desplazamos al nodo con costo mas bajo y asignamos la procedencia
+        sNode *nextNode = &openL[bestIndex];
+        nextNode->xParent = currentN.row;
+        nextNode->yParent = currentN.col;
+        currentN = *nextNode;
+        printf("Nos desplazamos a: (%d,%d) desde (%d,%d)\n",currentN.row,currentN.col,currentN.xParent,currentN.yParent);
+        
 
 
+        if (currentN.row == goalN.row && currentN.col == goalN.col) {
+            printf("Goal reached!\n");
+            printf("objetivo alcanzado en %d iteraciones\n",iteration);
+            // Aquí deberías reconstruir y mostrar el camino
+            return;
+        }
 
-    printf("coordenada DESPUES de moverse (%.1f,%.1f)\n",currentN.row, currentN.col);
+
+        iteration++;//incrementar la variable de control
+        }
 
 
-
-
-    if (currentN.row == goalN.row && currentN.col == goalN.col) {
-        printf("Goal reached!\n");
-        // Aquí deberías reconstruir y mostrar el camino
-        return;
-    }
-
-    // updateNeighbors(&openL[0], nodesMatrix, neighbors, &count);//revisemos los vecinos en la lista abierta iteracion 1
-
-    printf("coordenada despues de moverse y eliminar el nodo inicial (%.1f,%.1f)\n",openL[0].row,openL[0].col);
-    
+        // Si el bucle termina por alcanzar maxIterations
+        if (iteration >= maxIterations) {
+            printf("Max iterations reached: %d\n", maxIterations);
+        }
 }
 
 
-void rmFromOpenL(sNode nodeToRM){
+
+
+void rmFromOpenL(sNode* nodeToRM){
     int indexToRm = -1;
+    // printf("Vamos a eliminar (%d,%d) de la lista abierta\n",nodeToRM->row,nodeToRM->col);
+    // printf("openLsize: %d\n",openLsize);
+    closedL[nodeToRM->row][nodeToRM->col] = true;
+    nodeToRM->bVisited = true;
+
     for (int i = 0; i < openLsize; i++){
-        if (openL[i].row == nodeToRM.row && openL[i].col == nodeToRM.col){
+        // printf("Recorriendo OpenL: en nodo (%d,%d)\n",openL[i].row,openL[i].col);
+    }
+
+    for (int i = 0; i < openLsize; i++){
+        if (openL[i].row == nodeToRM->row && openL[i].col == nodeToRM->col){
             indexToRm = i;
             break;
         }        
     }
 
+    // printf("Nodo (%d,%d) Eliminado de la lista abierta\n",nodeToRM->row,nodeToRM->col);
+    
     if (indexToRm != -1){
         if (indexToRm < openLsize -1){
             openL[indexToRm] = openL[--openLsize];
@@ -260,27 +286,26 @@ void rmFromOpenL(sNode nodeToRM){
         else{
             --openLsize;
         }
+    }
+    // printf("openLsize: %d\n",openLsize);
 
+    for (int i = 0; i < openLsize; i++){
+        // printf("Recorriendo OpenL: en nodo (%d,%d)\n",openL[i].row,openL[i].col);
     }
 
 }
 
-
-void checkCosts(void){
-    int bestIndex = 0;
-    for (int i = 0; i < openLsize; i++) {
-        printf("iteracion (%.1f)\n", i);
-
-        if (f_cost(&openL[i])){
-            /* code */
+void searchBestF(void){
+    
+    bestIndex = 0;  //reiniciamos la variable para empezar la busqueda
+    //recorremos OpenL
+    for (int i = 1; i < openLsize; i++){
+        //Comparamos los f cost para buscar el mejor
+        if (f_cost(&openL[i]) <= f_cost(&openL[bestIndex])){
+            bestIndex = i;  //guardamos el valor del menor fcost
         }
-        
-        
-        printf("(%.1f, %.1f)\n", neighbors[i].row, neighbors[i].col);
-        printf("gcost %.1f\n",g_cost(&neighbors[i]));
-        printf("hcost %.1f\n",h_cost(&neighbors[i]));
-        printf("fcost %.1f\n\n",f_cost(&neighbors[i]));
     }
+    printf("El mejor fcost es %d con coordenada (%d,%d)\n",f_cost(&openL[bestIndex]),openL[bestIndex].row,openL[bestIndex].col);
 }
 
 
@@ -327,9 +352,4 @@ void main(){
     init_grid(nodesMatrix);
     print_grid(nodesMatrix,&startN,&goalN);
     aStar(nodesMatrix);
-
-    // updateNeighbors(&startN, nodesMatrix, neighbors, &count);
-    // print_neighbors(neighbors, count);
-
-    // printf("prueba manhattan %d:\n",manhattan_Dist(&currentN,&goalN));
 }
